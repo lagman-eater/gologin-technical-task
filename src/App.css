@@ -1,0 +1,129 @@
+.App {
+  text-align: center;
+  max-width: 1200px;
+  margin: 50px auto;
+  min-height: 1200px;
+}
+
+.App header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 30px;
+}
+.App header h1{
+  text-align: left;
+}
+.App header .parseBtn{
+  width: 120px;
+  height: 50px;
+  background-color: aquamarine;
+  border: none;
+  border-radius: 10px;
+  text-transform: uppercase;
+  transition: all .3s ease;
+}
+.App header .parseBtn:enabled{
+  cursor: pointer;
+}
+.App header .parseBtn:disabled{
+  color: #000;
+  opacity: 0.4;
+}
+.App header .parseBtn:hover:enabled{
+  background-color: hsl(160, 100%, 90%);
+}
+.App header .parseBtn:active:enabled{
+  width: 100px;
+  height: 40px;
+}
+.App header .backBtn{
+  width: 120px;
+  height: 50px;
+  background-color: #fff;
+  border: 1px solid hsl(0, 0%, 70%);
+  border-radius: 5px;
+  transition: all .3s ease;
+  cursor: pointer;
+}
+.App header .backBtn:hover{
+  background-color: hsl(0, 0%, 80%);
+}
+.App main {
+  margin: 30px;
+  padding: 100px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: dashed 1px #808080;
+  border-radius: 5px;
+}
+.dragActive{
+ border: dashed 1px red !important; 
+ background-color: hsl(0, 0%, 80%);
+}
+.App main img{
+  width: 60px;
+  height: 60px;
+}
+.App main h2{
+  margin: .7rem;
+}
+.buttons{
+  display: flex;
+  align-items: center;
+}
+.buttons button,
+.buttons label{
+  width: 170px;
+  height: 50px;
+  margin: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all .3s ease;
+}
+.buttons label{
+  background-color: aqua;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.buttons input{
+  display: none;
+}
+.buttons label:hover{
+  background-color: hsl(180, 100%, 80%);
+}
+.buttons button{
+  background-color: #fff;
+  border: #808080 1px solid;
+  color: aqua;
+}
+.buttons button:hover{
+  background-color: hsl(180, 100%, 90%);
+}
+
+.textArea{
+  margin: 30px;
+  margin-right: 60px;
+  min-height: 200px;
+}
+.textArea textarea{
+  padding: 15px;
+  border: 1px solid #808080;
+  border-radius: 5px;
+  width: 100%;
+  /* min-height: 200px; */
+  resize: vertical;
+  font-size: 16px;
+}
+.textArea textarea::placeholder{
+  font-size: 1rem;
+}
+
+.App table{
+  width: 100%;
+}
