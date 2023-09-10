@@ -1,0 +1,879 @@
+import React, { useEffect, useRef, useState } from "react";
+import { useAppDispatch, useAppSelector } from "shared/lib/hooks/hooks";
+import { getMarathons } from "entities/admin/model/thunk/getMarathons";
+
+import { getMarathonById } from "entities/admin/model/thunk/getMarathonById";
+import { clearExtendedMarathon } from "entities/admin/model/slice";
+import { createVoucher } from "entities/admin/model/thunk/createVoucher";
+import { getVouchers } from "entities/admin/model/thunk/getVouchers";
+
+import { useForm, Controller, SubmitHandler } from "react-hook-form";
+
+import dayjs, { Dayjs } from "dayjs";
+import { IMarathon } from "entities/admin/lib/types";
+
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+import TextField from "@mui/material/TextField";
+import Paper from "@mui/material/Paper";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import AddIcon from "@mui/icons-material/Add";
+import Typography from "@mui/material/Typography";
+import Modal from "@mui/material/Modal";
+import Autocomplete from "@mui/material/Autocomplete";
+import CircularProgress from "@mui/material/CircularProgress";
+import Select, { SelectChangeEvent } from "@mui/material/Select";
+import FormControl from "@mui/material/FormControl";
+
+import FormLabel from "@mui/material/FormLabel";
+import RadioGroup from "@mui/material/RadioGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Radio from "@mui/material/Radio";
+
+import { DesktopDatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+
+import VouchersList from "entities/admin/ui/Vouchers/VouchersList/VouchersList";
+import CreateVoucherModal from "entities/admin/ui/Vouchers/CreateVoucherModal/CreateVoucherModal";
+import ButtonWithProgress from "shared/ui/ButtonWIthProgress/ButtonWithProgress";
+import NoVouchers from "entities/admin/ui/Vouchers/NoVouchers/NoVouchers";
+
+import { postVouchersCreateThunk } from "entities/admin/model/thunk/postVouchersCreateThunk";
+import { getCorporateClientsThunk } from "entities/admin/model/thunk/getCorporateClientsThunk";
+
+import styles from "./Vouchers.module.scss";
+import {
+  createVoucherAutoComplete,
+  createVoucherAutoCompleteInput,
+  createVoucherButton,
+  createVoucherDistance,
+  createVoucherDistanceName,
+  createVoucherModal,
+  createVoucherModalTitle,
+  defaultCircularProgress,
+  datePickerVoucher,
+} from "entities/admin/lib/MUIStyles/MUIStyles";
+
+import closeIcon from "assets/images/modal/x.svg";
+import { DeleteCategoryField, PlusIcon } from "assets/icons";
+import subvoucherOff from "assets/images/modal/subVoucheroff.svg";
+import VouchersSearch from "./VouchersList/VouchersFilter";
+import("dayjs/locale/ru");
+
+type PromocodeType = {
+  distanceId: number;
+  quantity: number;
+};
+
+type corporateClient = {
+  id: number;
+  name: string;
+  responsibleUserEmail: string;
+}
+
+type CreateVoucher = {
+  name: string;
+  marathonId: number;
+  expirationDate: string;
+  discount: number;
+  quantity: number;
+  corporateClient: corporateClient;
+  promocodes: PromocodeType[];
+};
+const CustomPaper = (props: any) => {
+  return (
+    <Paper
+      elevation={8}
+      {...props}
+      sx={{ borderRadius: "12px", marginTop: "5px" }}
+    />
+  );
+};
+
+const theme = createTheme({
+  components: {
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: "#0090D1",
+          },
+        },
+      },
+    },
+  },
+});
+
+const Vouchers: React.FC = (): any => {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    formState: { errors, isValid },
+  } = useForm<CreateVoucher>();
+  const dispatch = useAppDispatch();
+
+  const marathons = useAppSelector((state) => state.marathon.marathons);
+
+  const corporateClients = useAppSelector((state) => state.marathon.corporateClient);
+
+  const specificMarathon = useAppSelector(
+    (state) => state.marathon.extendedMarathon
+  );
+  const getMarathonByIdLoading = useAppSelector(
+    (state) => state.marathon.getMarathonByIdLoading
+  );
+  const createVoucherLoading = useAppSelector(
+    (state) => state.marathon.createVoucherLoading
+  );
+  const vouchers = useAppSelector((state) => state.marathon.vouchers);
+  const getVouchersListLoading = useAppSelector(
+    (state) => state.marathon.getVouchersListLoading
+  );
+
+  const label = { inputProps: { "aria-label": "Checkbox demo" } };
+
+  const specificMarathonDistancesIdRef = useRef<any>(null);
+  const [selectedMarathon, setSelectedMarathon] = useState<IMarathon | null>(
+    null
+  );
+
+  const [selectedClient, setSelectedClient] = useState<CreateVoucher | null>(
+    null
+  );
+
+  const [voucherCreationModal, setVoucherCreationModal] = useState(false);
+  const [distances, setDistances] = useState([
+    { distanceId: "", quantity: "" },
+  ]);
+  const [specificMarathonDistances, setSpecificMarathonDistances] =
+    useState<any>([]);
+  const [currentDistanceIndex, setCurrentDistanceIndex] = useState<
+    null | number
+  >(null);
+  const [voucherName, setVoucherName] = useState<string>("");
+  const [createVoucherModalOpen, setCreateVoucherModalOpen] =
+    useState<boolean>(false);
+
+  const [dateValidity, setDateValidity] = React.useState<any>(null);
+
+  const handleCloseCreateVoucherModal = () => setCreateVoucherModalOpen(false);
+
+  const handleSelectedMarathon = (newSelectedMarathon: any, reason: any) => {
+    if (reason === "clear") {
+      dispatch(clearExtendedMarathon());
+      setDistances([{ distanceId: "", quantity: "" }]);
+    }
+
+    if (reason === "selectOption" && distances.length > 0) {
+      setDistances([{ distanceId: "", quantity: "" }]);
+    }
+
+    setSelectedMarathon(newSelectedMarathon);
+  };
+  const handleVoucherCreationModalOpen = () => setVoucherCreationModal(true);
+  const handleVoucherCreationModalClose = () => setVoucherCreationModal(false);
+
+  const handleDistanceChange = (
+    event: SelectChangeEvent,
+    index: number,
+    distanceId: string
+  ) => {
+    const { name, value } = event.target;
+
+    let specificDistanceRemainingPlaces = null;
+
+    if (specificMarathon) {
+      specificDistanceRemainingPlaces = specificMarathon.distances.find(
+        (specificMarathonDistance: any) => {
+          return specificMarathonDistance.id === distanceId;
+        }
+      );
+    }
+
+    if (name === "quantity") {
+      if (
+        specificDistanceRemainingPlaces &&
+        specificDistanceRemainingPlaces?.remainingPlaces
+      ) {
+        if (+value > specificDistanceRemainingPlaces.remainingPlaces) {
+          return;
+        }
+      }
+    }
+
+    setCurrentDistanceIndex(index);
+    setDistances((prevState) => {
+      return prevState.map((distance, distanceIndex) => {
+        if (index === distanceIndex) {
+          if (name === "quantity") {
+            return { ...distance, [name]: value.replace(/\D/g, "") };
+          } else {
+            return { ...distance, [name]: value };
+          }
+        }
+
+        return distance;
+      });
+    });
+  };
+
+  const addDistanceHandler = () => {
+    setDistances((prevState) => [
+      ...prevState,
+      { distanceId: "", quantity: "" },
+    ]);
+  };
+
+  const deleteDistanceHandler = (index: number) => {
+    setDistances((prevState) => {
+      return prevState.filter(
+        (distance, distanceIndex) => distanceIndex !== index
+      );
+    });
+  };
+
+  const handleSelectedCorporateClient = (corporateClient: any) => {
+    setSelectedClient(corporateClient)
+  };
+
+  const dateOfValidityHandler = (newDateOfValidity: Dayjs | null) => {
+    setDateValidity(newDateOfValidity as Dayjs);
+  };
+
+  useEffect(() => {
+    if (selectedMarathon) {
+      dispatch(getMarathonById(selectedMarathon.id));
+    }
+  }, [dispatch, selectedMarathon]);
+
+  useEffect(() => {
+    dispatch(getMarathons());
+    dispatch(getVouchers());
+    dispatch(getCorporateClientsThunk())
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (specificMarathon) {
+      setSpecificMarathonDistances(specificMarathon.distances);
+      let specificMarathonDistancesId: any = {};
+      specificMarathon.distances.forEach((specificMarathonDistance: any) => {
+        specificMarathonDistancesId[specificMarathonDistance.id] =
+          specificMarathonDistance.remainingPlaces;
+      });
+
+      specificMarathonDistancesIdRef.current = specificMarathonDistancesId;
+    }
+  }, [specificMarathon]);
+
+  useEffect(() => {
+    if (typeof currentDistanceIndex === "number") {
+      setSpecificMarathonDistances((prevState: any) => {
+        return prevState.map((specificMarathonDistance: any) => {
+          if (
+            specificMarathonDistance.id ===
+            distances[currentDistanceIndex]?.distanceId
+          ) {
+            return {
+              ...specificMarathonDistance,
+              remainingPlaces:
+                specificMarathonDistancesIdRef.current[
+                distances[currentDistanceIndex]?.distanceId
+                ] - +distances[currentDistanceIndex].quantity,
+            };
+          }
+
+          return specificMarathonDistance;
+        });
+      });
+    }
+  }, [distances, currentDistanceIndex]);
+
+  // const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => { 
+  //   event.preventDefault(); 
+  //   const voucherData = { 
+  //     name: voucherName, 
+  //     marathonId: selectedMarathon?.id, 
+  //     expirationDate: "2023-08-14T08:44:10.385Z", 
+  //     discount: 100, 
+  //     quantity: 0, 
+  //     corporateClient: { 
+  //       name: "string", 
+  //       responsibleUserEmail: "string", 
+  //     }, 
+  //     promocodes: distances.map((distance) => ({ 
+  //       distanceId: distance.distanceId, 
+  //       quantity: +distance.quantity, 
+  //     })), 
+  //   }; 
+
+  const submit: SubmitHandler<any> = (data) => {
+    dispatch(postVouchersCreateThunk(data));
+    console.log(data);
+    // reset() 
+  };
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const voucherData = {
+      name: voucherName,
+      marathonId: selectedMarathon?.id,
+      promocodes: distances.map((distance) => ({
+        distanceId: distance.distanceId,
+        quantity: +distance.quantity,
+      })),
+    };
+
+    const response = await dispatch(createVoucher({ ...voucherData }));
+
+    if (response.meta.requestStatus === "fulfilled") {
+      handleVoucherCreationModalClose();
+      setSelectedMarathon(null);
+      setVoucherName("");
+      setDistances([{ distanceId: "", quantity: "" }]);
+      dispatch(clearExtendedMarathon());
+      setCreateVoucherModalOpen(true);
+      dispatch(getVouchers());
+    }
+  };
+
+  const error: SubmitHandler<CreateVoucher> = (data) => { };
+
+  //   const response = await dispatch(createVoucher({ ...voucherData })); 
+
+  //   if (response.meta.requestStatus === "fulfilled") { 
+  //     handleVoucherCreationModalClose(); 
+  //     setSelectedMarathon(null); 
+  //     setVoucherName(""); 
+  //     setDistances([{ distanceId: "", quantity: "" }]); 
+  //     dispatch(clearExtendedMarathon()); 
+  //     setCreateVoucherModalOpen(true); 
+  //     dispatch(getVouchers()); 
+  //   } 
+  // }; 
+
+  console.log(specificMarathonDistances);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <div className={styles.vouchersContainer}>
+        <div className={styles.vouchersTop}>
+          <h2 className={styles.vouchersMainTitle}>Ваучеры</h2>
+          <Button
+            variant="contained"
+            type="button"
+            startIcon={<AddIcon />}
+            onClick={handleVoucherCreationModalOpen}
+            sx={createVoucherButton}
+          >
+            Создать
+          </Button>
+        </div>
+
+        <div className={styles.vouchers}>
+
+          {/* Поиск */}
+          <VouchersSearch
+            selectedNameMarathon={""}
+            setSelectedNameMarathon={""}
+          // selectedDocument={""} 
+          // setSelectedDocument={""} 
+          />
+          {getVouchersListLoading ? (
+            <CircularProgress size={40} sx={defaultCircularProgress} />
+          ) : vouchers.length === 0 ? (
+            <NoVouchers />
+          ) : (
+            <VouchersList />
+          )}
+        </div>
+
+        <Modal
+          open={voucherCreationModal}
+          onClose={handleVoucherCreationModalClose}
+          aria-labelledby="modal-modal-title"
+          aria-describedby="modal-modal-description"
+          sx={{ outline: "none" }}
+        >
+          <Box sx={createVoucherModal}>
+            <form onSubmit={handleSubmit(submit)}>
+              <div className={styles.modalTop}>
+                <Typography
+                  id="modal-modal-title"
+                  variant="h2"
+                  component="h2"
+                  sx={createVoucherModalTitle}
+                >
+                  Создать ваучер
+                </Typography>
+                <img
+                  onClick={() => {
+                    handleVoucherCreationModalClose();
+                    setSelectedMarathon(null);
+                    setVoucherName("");
+                    setDistances([{ distanceId: "", quantity: "" }]);
+                    dispatch(clearExtendedMarathon());
+                  }}
+                  className={styles.modalTopCloseIcon}
+                  src={closeIcon}
+                  alt="Закрыть"
+                />
+              </div>
+              <span className={styles.marathonName}>Марафон</span>
+              <div className={styles.form}>
+                <Controller
+                  control={control}
+                  name="marathonId"
+                  render={({ field: { onChange } }) => (
+                    <Autocomplete
+                      disablePortal
+                      options={marathons}
+                      getOptionLabel={(option) => option.name}
+                      value={selectedMarathon}
+                      PaperComponent={CustomPaper}
+                      isOptionEqualToValue={(option, value) =>
+                        option.id === value.id
+                      }
+                      onChange={(event, newValue, reason) =>
+                        handleSelectedMarathon(newValue, reason)
+                      }
+                      sx={{
+                        ...createVoucherAutoComplete,
+                        width: "100%",
+                        marginBottom: "15px",
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          placeholder="Выберите марафон"
+                          sx={createVoucherAutoCompleteInput}
+                        />
+                      )}
+                      renderOption={(props, option) => {
+                        return (
+                          <li
+                            {...props}
+                            key={option.id}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <span className={styles.optionName}>
+                              {option.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                color: "#68717B",
+                              }}
+                            >
+                              {dayjs(option.date)
+                                .locale("ru")
+                                .format("D MMMM, YYYY")}
+                            </span>
+                          </li>
+                        );
+                      }}
+                    />
+                  )}
+                />
+              </div>
+              <div className={styles.marathonNameContainer}>
+                <label className={styles.marathonName}>
+                  Название ваучера
+                  <input
+                    maxLength={50}
+                    type="text"
+                    // value={voucherName} 
+                    // onChange={(e) => setVoucherName(e.target.value)} 
+                    placeholder="Введите название ваучера"
+                    className={styles.marathonNameInput}
+                    {...register("name", { required: false })}
+                  />
+                </label>
+                {errors?.name && (
+                  <p>Название должно содержать максимум 50 символов</p>
+                )}
+              </div>
+              {/* корпоративный клиент select */}
+              <div className={styles.voucherDistanceContainer}>
+                <div>
+                  <span className={styles.marathonAutoCompleteLabel}>
+                    Название корп клиента
+                  </span>
+                  <Controller
+                    control={control}
+                    name="corporateClient.name"
+                    render={({ field: { onChange } }) => (
+                      <Autocomplete
+                        disablePortal
+                        options={corporateClients.data.query}
+                        value={selectedClient}
+                        getOptionLabel={(option) => option.name}
+                        PaperComponent={CustomPaper}
+                        // isOptionEqualToValue={(option, value) => 
+                        //   option.id === value.id 
+                        // } 
+                        onChange={(event, option) => handleSelectedCorporateClient(option)}
+                        sx={{
+                          ...createVoucherAutoComplete,
+                          width: "100%",
+                          marginBottom: "22px",
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            placeholder="Введите название"
+                            sx={createVoucherDistanceName}
+                          />
+                        )}
+                        renderOption={(props, option) => {
+                          return (
+                            <li
+                              {...props}
+                              key={option.marathonId}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span className={styles.optionName}>
+                                {option.name}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: "#68717B",
+                                }}
+                              ></span>
+                            </li>
+                          );
+                        }}
+                      />
+                    )}
+                  />
+                </div>
+                <div className={styles.voucherSlotsAmount}>
+                  <label className={styles.marathonName}>
+                    Общее количество слотов
+                    <input
+                      type="text"
+                      // name="quantity" 
+                      // value={distance.quantity} 
+
+                      className={styles.voucherSlotsAmountInput}
+                      placeholder="Укажите количество"
+                      {...register("quantity", { required: false })}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {distances.map((distance, index) => (
+                <div
+                  className={styles.voucherDistanceContainer}
+                  key={index}
+                >
+                  <FormControl fullWidth sx={{ width: "49%" }}>
+                    <>
+                      <span className={styles.chooseDistance}>
+                        Дистанция
+                      </span>
+                      {distance.distanceId ? null : (
+                        <InputLabel
+                          id="demo-simple-select-label"
+                          sx={createVoucherDistance}
+                          shrink={false}
+                        >
+                          Выберите дистанцию
+                        </InputLabel>
+                      )}
+                    </>
+                    <Select
+                      value={distance.distanceId}
+                      name="distanceId"
+                      defaultValue=""
+                      onChange={(e) => {
+
+
+                        handleDistanceChange(
+                          e,
+                          index,
+                          distance.distanceId
+                        );
+                      }}
+                      sx={createVoucherDistanceName}
+                    >
+                      {specificMarathon?.distances.map(
+                        (specificDistance) => {
+                          const distanceIndexes: any[] = [];
+
+                          distances.forEach((innerDistance) => {
+                            distanceIndexes.push(
+                              innerDistance.distanceId
+                            );
+                          });
+
+                          if (
+                            distanceIndexes.includes(specificDistance.id)
+                          ) {
+                            return (
+                              <MenuItem
+                                sx={{ display: "none" }}
+                                key={specificDistance.id}
+                                value={specificDistance.id}
+                              >
+                                {specificDistance.name}
+                              </MenuItem>
+                            );
+                          } else {
+                            return (
+                              <MenuItem
+                                sx={{ overflowX: "auto" }}
+                                key={specificDistance.id}
+                                value={specificDistance.id}
+                              >
+                                {distanceIndexes.includes(
+                                  specificDistance.name
+                                )
+                                  ? null
+                                  : specificDistance.name}
+                              </MenuItem>
+                            );
+                          }
+                        }
+                      )}
+                    </Select>
+                  </FormControl>
+
+                  <div className={styles.voucherSlotsAmount}>
+                    <label>
+                      Кол-во слотов
+                      <input
+                        type="text"
+                        name="quantity"
+                        value={distance.quantity}
+                        disabled={
+                          distance.distanceId === "" ? true : false
+                        }
+                        onChange={(e) =>
+                          handleDistanceChange(
+                            e,
+                            index,
+                            distance.distanceId
+                          )
+                        }
+                        className={styles.voucherSlotsAmountInput}
+                        placeholder="Укажите количество"
+                      />
+                    </label>
+                  </div>
+
+                  <div>
+                    <span className={styles.availableSlots}>
+                      {specificMarathonDistances.find(
+                        (specificMarathonDistance: any) =>
+                          specificMarathonDistance?.id ===
+                          distance?.distanceId
+                      )?.remainingPlaces === 0
+                        ? "Всего доступно: " +
+                        specificMarathonDistances.find(
+                          (specificMarathonDistance: any) =>
+                            specificMarathonDistance?.id ===
+                            distance?.distanceId
+                        )?.remainingPlaces
+                        : null}
+                      {specificMarathonDistances.find(
+                        (specificMarathonDistance: any) =>
+                          specificMarathonDistance?.id ===
+                          distance?.distanceId
+                      )?.remainingPlaces
+                        ? "Всего доступно: " +
+                        specificMarathonDistances.find(
+                          (specificMarathonDistance: any) =>
+                            specificMarathonDistance?.id ===
+                            distance?.distanceId
+                        )?.remainingPlaces
+                        : null}
+                    </span>
+
+                    <Button
+                      variant="text"
+                      sx={{
+                        padding: "8px 25px",
+                        textTransform: "capitalize",
+                        marginLeft: "auto",
+                      }}
+                      startIcon={<DeleteCategoryField />}
+                      onClick={() => deleteDistanceHandler(index)}
+                    >
+                      Удалить
+                    </Button>
+                  </div>
+                </div>
+              ))
+              }
+              {specificMarathon ? (
+                specificMarathon.distances.length !== distances.length ? (
+                  <Button
+                    variant="text"
+                    type="button"
+                    startIcon={<PlusIcon />}
+                    sx={{ textTransform: "none" }}
+                    onClick={addDistanceHandler}
+                  >
+                    Добавить дистанцию
+                  </Button>
+                ) : null
+              ) : null}
+              <div className={styles.voucherDiscountContainer}>
+                <div className={styles.voucherSlotsAmount}>
+                  <label className={styles.marathonAutoCompleteLabel}>
+                    Размер скидки (%)
+                    <input
+                      type="text"
+                      placeholder="1-100%"
+                      className={styles.voucherSlotsDiscount}
+                      {...register("discount", { required: false })}
+                    />
+                  </label>
+                </div>
+                <div className={styles.voucherSlotsAmount}>
+                  <span className={styles.marathonName}>Срок действия</span>
+                  <Controller
+                    name="expirationDate"
+                    control={control}
+                    render={({ field: { onChange } }) => (
+                      <LocalizationProvider
+                        dateAdapter={AdapterDayjs}
+                        adapterLocale={"ru"}
+                      >
+                        <DesktopDatePicker
+                          value={dateValidity}
+                          onChange={dateOfValidityHandler}
+                          // label="Дата окончания ваучера" 
+                          inputFormat={"DD.MM.YYYY"}
+                          // className={styles.voucherSlotsAmountInput} 
+                          renderInput={(params) => (
+                            <TextField
+                              autoComplete="off"
+                              size="small"
+                              sx={datePickerVoucher}
+                              {...register("expirationDate", {
+                                required: false,
+                              })}
+                              {...params}
+                              inputProps={{
+                                ...params.inputProps,
+                                placeholder: "Укажите дату",
+                              }}
+                            />
+                          )}
+                        />
+                      </LocalizationProvider>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className={`${styles.voucherDistanceContainer} ${styles.subVoucher}`}>
+                
+                <div className={` ${styles.createVoucherModalBottom}  ${styles.vouchersResponsibleFace}`}>
+                  <p className={styles.chooseDistance}>
+                    Создание сабваучеров ответственным лицом
+                  </p>
+                  <img src={subvoucherOff} alt="" />
+                </div>
+
+                <div className={styles.typeVouchWrapper}>
+                  <FormControl
+                    component="fieldset"
+                    className={styles.typevouchercorp}
+                  >
+                    <Controller
+                      rules={{ required: false }}
+                      control={control}
+                      name="name"
+                      render={({ field }) => {
+                        // console.log(field); 
+                        return (
+                          <RadioGroup {...field}>
+                            <FormControlLabel
+                              value="corp"
+                              control={<Radio />}
+                              className={styles.createVoucherType}
+                              label="Корпоративный"
+                            />
+                            <FormControlLabel
+                              value="personal"
+                              control={<Radio />}
+                              className={styles.createVoucherType}
+                              label="Индивидуальный"
+                            />
+                          </RadioGroup>
+                        );
+                      }}
+                    />
+                  </FormControl>
+                </div>
+
+                <div className={styles.createVoucherModalBottom}>
+                  <Button
+                    type="button"
+                    variant="text"
+                    onClick={() => {
+                      handleVoucherCreationModalClose();
+                      setSelectedMarathon(null);
+                      setVoucherName("");
+                      setDistances([{ distanceId: "", quantity: "" }]);
+                      dispatch(clearExtendedMarathon());
+                    }}
+                    sx={{
+                      display: "block",
+                      marginBottom: "20px",
+                      textTransform: "none",
+                      color: "#0090D1",
+                    }}
+                  >
+                    Отмена
+                  </Button>
+                  <ButtonWithProgress
+                    type="submit"
+                    variant="contained"
+                    loading={createVoucherLoading}
+                    sx={{
+                      display: "block",
+                      backgroundColor: "#E9EAEB",
+                      borderRadius: "12px",
+                      padding: "8px 24px",
+                      marginBottom: "20px",
+                      marginLeft: "30px",
+                      textTransform: "capitalize",
+                      cursor: "pointer",
+
+                      "&:hover": {
+                        backgroundColor: "#0090D1",
+                      },
+                    }}
+                  >
+                    Сохранить
+                  </ButtonWithProgress>
+                </div>
+              </div>
+            </form>
+          </Box >
+        </Modal >
+        <CreateVoucherModal
+          createVoucherModalOpen={createVoucherModalOpen}
+          handleCloseCreateVoucherModal={handleCloseCreateVoucherModal}
+        />
+      </div >
+    </ThemeProvider >
+  );
+};
+
+export default Vouchers;
+
