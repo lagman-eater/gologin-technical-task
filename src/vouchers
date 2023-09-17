@@ -311,8 +311,15 @@ const Vouchers: React.FC = (): any => {
   //   }; 
 
   const submit: SubmitHandler<any> = (data) => {
-    dispatch(postVouchersCreateThunk(data));
     console.log(data);
+    dispatch(postVouchersCreateThunk({...data, 
+      corporateClient: selectedClient,   
+      "promocodes": [{
+        "distanceId": 1,
+        "quantity": 100
+      }],
+      "marathonId": 1
+    }));
     // reset() 
   };
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -354,7 +361,9 @@ const Vouchers: React.FC = (): any => {
   //   } 
   // }; 
 
+  // console.log(distances);
   console.log(specificMarathonDistances);
+  
 
   return (
     <ThemeProvider theme={theme}>
@@ -876,4 +885,3 @@ const Vouchers: React.FC = (): any => {
 };
 
 export default Vouchers;
-
